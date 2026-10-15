@@ -135,10 +135,18 @@ class TelegramBotListener:
                         continue
 
                     text = msg.get("text", "")
+                    sender = msg.get("from", {})
+                    sender_username = (sender.get("username") or "").strip().lower()
                     sender_chat_id = str(msg.get("chat", {}).get("id", ""))
                     thread_id = msg.get("message_thread_id")
 
                     if text.startswith("/"):
+                        # Only allow authorized admin usernames
+                        if self.config.ADMIN_USERNAMES:
+                            if sender_username not in self.config.ADMIN_USERNAMES:
+                                print(f"[Telegram Bot] Bỏ qua lệnh '{text}' từ @{sender_username} (không có trong danh sách cho phép).")
+                                continue
+
                         self.handle_command(text, sender_chat_id, message_thread_id=thread_id)
 
             except requests.exceptions.Timeout:
