@@ -1,6 +1,7 @@
 import sys
 import time
 import argparse
+import threading
 from datetime import datetime
 
 # Configure Windows console UTF-8 output
@@ -10,16 +11,19 @@ if sys.platform == "win32":
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
+
 from src.config import Config
 from src.state_manager import StateManager
 from src.trello_client import TrelloClient
 from src.telegram_client import TelegramClient
 from src.notifier import Notifier
+from src.analytics import TrelloAnalytics
+from src.bot_listener import TelegramBotListener
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Trello to Telegram Due Tasks Alert Bot - Gửi cảnh báo task Trello sắp hết hạn về Telegram",
+        description="Trello to Telegram Due Tasks Alert Bot - Gửi cảnh báo & Phân tích tiến độ Trello",
         formatter_class=argparse.RawTextHelpFormatter,
     )
     parser.add_argument(
@@ -33,14 +37,19 @@ def parse_args():
         help="Hiển thị danh sách tất cả các bảng Trello để lấy ID cấu hình",
     )
     parser.add_argument(
+        "--phantich",
+        action="store_true",
+        help="Phân tích khối lượng công việc, tỉ lệ hoàn thành và xếp hạng thành viên",
+    )
+    parser.add_argument(
         "--once",
         action="store_true",
-        help="Chạy quét 1 lần duy nhất rồi thoát (phù hợp cho Task Scheduler / Cron job)",
+        help="Chạy quét cảnh báo 1 lần duy nhất rồi thoát (phù hợp cho Task Scheduler)",
     )
     parser.add_argument(
         "--daemon",
         action="store_true",
-        help="Chạy thường trực nền (lặp lại định kỳ theo CHECK_INTERVAL_MINUTES)",
+        help="Chạy thường trực: tự động quét định kỳ VÀ lắng nghe lệnh Telegram (/phantich, /quet)",
     )
     parser.add_argument(
         "--dry-run",
@@ -101,18 +110,76 @@ def handle_list_boards(trello: TrelloClient):
     print("=" * 60)
 
 
+def handle_phantich(analytics: TrelloAnalytics, telegram: TelegramClient, dry_run: bool = False):
+    print("=" * 60)
+    print("📊 BẮT ĐẦU PHÂN TÍCH TIẾN ĐỘ & XẾP HẠNG THÀNH VIÊN TRELLO")
+    print("=" * 60)
+    data = analytics.analyze()
+    messages = analytics.format_report_html(data)
+
+    for msg in messages:
+        if dry_run:
+            print("\n" + msg)
+        else:
+            res = telegram.send_message(msg)
+            if res.get("success"):
+                print("✅ Đã gửi báo cáo phân tích thành công tới Telegram!")
+            else:
+                print(f"❌ Lỗi khi gửi báo cáo: {res.get('error')}")
+
+
+def run_daemon_mode(notifier: Notifier, listener: TelegramBotListener, dry_run: bool = False):
+    print("=" * 60)
+    print("🚀 BẮT ĐẦU CHẠY THƯỜNG TRỰC (DAEMON + TELEGRAM LISTENER)")
+    print(f"   • Tần suất quét hạn chót: mỗi {Config.CHECK_INTERVAL_MINUTES} phút")
+    print("   • Đang lắng nghe lệnh Telegram: /phantich, /quet, /help")
+    print("   • Nhấn Ctrl+C để dừng chương trình bất cứ lúc nào.")
+    print("=" * 60)
+
+    stop_event = threading.Event()
+    interval_secs = max(60, Config.CHECK_INTERVAL_MINUTES * 60)
+
+    def periodic_scanner():
+        # Run first scan immediately
+        try:
+            notifier.scan_and_alert(dry_run=dry_run)
+        except Exception as e:
+            print(f"[Scanner] Lỗi quét lần đầu: {e}")
+
+        while not stop_event.is_set():
+            # Wait with check interval or stop event
+            if stop_event.wait(timeout=interval_secs):
+                break
+            try:
+                notifier.scan_and_alert(dry_run=dry_run)
+            except Exception as e:
+                print(f"[Scanner] Lỗi quét định kỳ: {e}")
+
+    # Start periodic scanner thread
+    scan_thread = threading.Thread(target=periodic_scanner, daemon=True)
+    scan_thread.start()
+
+    # Start Telegram listener in main thread
+    try:
+        listener.start_polling(stop_event=stop_event)
+    except KeyboardInterrupt:
+        print("\n🛑 Nhận tín hiệu dừng từ người dùng...")
+    finally:
+        stop_event.set()
+        listener.stop()
+        print("✅ Đã dừng an toàn tất cả các tiến trình.")
+
+
 def main():
     args = parse_args()
 
     # If no flags provided, default to --once
-    if not (args.test or args.list_boards or args.daemon or args.once or args.dry_run):
+    if not (args.test or args.list_boards or args.phantich or args.daemon or args.once or args.dry_run):
         args.once = True
 
     # Validate config
     try:
-        if args.list_boards:
-            Config.validate(check_trello=True, check_telegram=False)
-        elif args.dry_run:
+        if args.list_boards or args.dry_run:
             Config.validate(check_trello=True, check_telegram=False)
         else:
             Config.validate(check_trello=True, check_telegram=True)
@@ -124,6 +191,8 @@ def main():
     telegram = TelegramClient(Config.TELEGRAM_BOT_TOKEN, Config.TELEGRAM_CHAT_ID)
     state_mgr = StateManager(Config.STATE_FILE)
     notifier = Notifier(Config, trello, telegram, state_mgr)
+    analytics = TrelloAnalytics(Config, trello, telegram)
+    listener = TelegramBotListener(Config, trello, telegram, notifier, analytics)
 
     if args.test:
         handle_test(trello, telegram)
@@ -133,26 +202,12 @@ def main():
         handle_list_boards(trello)
         return
 
-    if args.daemon:
-        interval_secs = max(60, Config.CHECK_INTERVAL_MINUTES * 60)
-        print("=" * 60)
-        print(f"🚀 BẮT ĐẦU CHẠY CHẾ ĐỘ NỀN (DAEMON)")
-        print(f"   - Tần suất kiểm tra: mỗi {Config.CHECK_INTERVAL_MINUTES} phút")
-        print(f"   - Nhấn Ctrl+C để dừng chương trình bất cứ lúc nào.")
-        print("=" * 60)
+    if args.phantich:
+        handle_phantich(analytics, telegram, dry_run=args.dry_run)
+        return
 
-        while True:
-            try:
-                notifier.scan_and_alert(dry_run=args.dry_run)
-                print(f"💤 Tạm nghỉ {Config.CHECK_INTERVAL_MINUTES} phút trước lần quét tiếp theo...")
-                time.sleep(interval_secs)
-            except KeyboardInterrupt:
-                print("\n🛑 Đã nhận tín hiệu dừng từ người dùng. Thoát chương trình.")
-                break
-            except Exception as e:
-                print(f"❌ Đã xảy ra lỗi không mong muốn trong chu kỳ quét: {e}")
-                print(f"Đợi 1 phút trước khi thử lại...")
-                time.sleep(60)
+    if args.daemon:
+        run_daemon_mode(notifier, listener, dry_run=args.dry_run)
     else:
         # Run once mode
         notifier.scan_and_alert(dry_run=args.dry_run)

@@ -30,11 +30,12 @@ echo  1. Kiểm tra kết nối Trello và Telegram (--test)
 echo  2. Xem danh sách các bảng Trello để lấy ID (--list-boards)
 echo  3. Quét và gửi cảnh báo 1 lần (--once)
 echo  4. Quét thử nghiệm không gửi tin (--dry-run)
-echo  5. Chạy thường trực kiểm tra định kỳ (--daemon)
-echo  6. Cài đặt lại thư viện (pip install)
+echo  5. Chạy thường trực kiểm tra định kỳ & lắng nghe lệnh Telegram (--daemon)
+echo  6. Xuất báo cáo phân tích khối lượng & xếp hạng thành viên (--phantich)
+echo  7. Cài đặt lại thư viện (pip install)
 echo  0. Thoát
 echo.
-set /p opt="Vui lòng chọn chức năng (0-6): "
+set /p opt="Vui lòng chọn chức năng (0-7): "
 
 if "%opt%"=="1" (
     .\venv\Scripts\python.exe main.py --test
@@ -62,6 +63,11 @@ if "%opt%"=="5" (
     goto menu
 )
 if "%opt%"=="6" (
+    .\venv\Scripts\python.exe main.py --phantich
+    pause
+    goto menu
+)
+if "%opt%"=="7" (
     .\venv\Scripts\python.exe -m pip install -r requirements.txt
     pause
     goto menu

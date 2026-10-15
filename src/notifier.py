@@ -111,7 +111,7 @@ class Notifier:
                     if not self.config.INCLUDE_OVERDUE:
                         continue
                     overdue_hours = abs(diff_seconds) / 3600.0
-                    if overdue_hours > self.config.MAX_OVERDUE_HOURS:
+                    if self.config.MAX_OVERDUE_HOURS > 0 and overdue_hours > self.config.MAX_OVERDUE_HOURS:
                         # Exceeds max overdue threshold
                         continue
                     

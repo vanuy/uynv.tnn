@@ -6,6 +6,15 @@ Hệ thống tự động quét các thẻ (card) trên Trello có hạn chót (
 
 ## 🌟 Tính Năng Nổi Bật
 
+- 📊 **Lệnh phân tích & Xếp hạng thành viên (`/phantich`):**
+  - Thống kê ai gánh nhiều task nhất trong nhóm.
+  - Tỉ lệ số task chưa hoàn thành trên tổng số task được giao (ví dụ: `69 / 149 (46.3%)`).
+  - Đếm số lượng task quá hạn của từng thành viên.
+  - Tự động xếp hạng (🥇, 🥈, 🥉) và đánh giá danh hiệu (Xuất sắc, Tốt, Quá tải, Cần hỗ trợ).
+- 🤖 **Tương tác trực tiếp trên Telegram:**
+  - Nhắn tin `/phantich` vào bot bất kỳ lúc nào để nhận báo cáo phân tích mới nhất.
+  - Nhắn tin `/quet` để bot quét ngay lập tức.
+  - Nhắn tin `/help` để xem danh sách lệnh.
 - ⏰ **Cảnh báo trước khi hết hạn:** Tự động phát hiện các task sắp đến hạn theo ngưỡng thời gian cấu hình (mặc định 24 giờ).
 - 🚨 **Cảnh báo task quá hạn:** Nhắc nhở các việc đã trễ hạn để kịp thời xử lý.
 - 🛡️ **Cơ chế chống spam thông minh (Deduplication):**
