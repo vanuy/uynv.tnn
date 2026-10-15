@@ -32,6 +32,7 @@ class Config:
 
     # Timezone & output options
     TIMEZONE = os.getenv("TIMEZONE", "Asia/Ho_Chi_Minh").strip()
+    DAILY_ALERT_TIME = os.getenv("DAILY_ALERT_TIME", "").strip()
     SEND_MODE = os.getenv("SEND_MODE", "detailed").strip().lower()
 
     # State file to avoid duplicate alerts

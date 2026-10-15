@@ -140,20 +140,42 @@ def run_daemon_mode(notifier: Notifier, listener: TelegramBotListener, dry_run: 
     interval_secs = max(60, Config.CHECK_INTERVAL_MINUTES * 60)
 
     def periodic_scanner():
-        # Run first scan immediately
-        try:
-            notifier.scan_and_alert(dry_run=dry_run)
-        except Exception as e:
-            print(f"[Scanner] Lỗi quét lần đầu: {e}")
+        last_triggered_date = None
+        daily_time = Config.DAILY_ALERT_TIME.strip()  # e.g. "16:00"
 
-        while not stop_event.is_set():
-            # Wait with check interval or stop event
-            if stop_event.wait(timeout=interval_secs):
-                break
+        if daily_time:
+            print(f"⏰ [Lịch cố định] Đã bật chế độ gửi cảnh báo đúng {daily_time} hàng ngày.")
+        else:
+            # Run first scan immediately if interval mode
             try:
                 notifier.scan_and_alert(dry_run=dry_run)
             except Exception as e:
-                print(f"[Scanner] Lỗi quét định kỳ: {e}")
+                print(f"[Scanner] Lỗi quét lần đầu: {e}")
+
+        while not stop_event.is_set():
+            if daily_time:
+                # Check every 30 seconds for daily time match
+                if stop_event.wait(timeout=30):
+                    break
+                now_local = datetime.now(notifier.tz)
+                cur_hm = now_local.strftime("%H:%M")
+                cur_date = now_local.strftime("%Y-%m-%d")
+
+                if cur_hm == daily_time and last_triggered_date != cur_date:
+                    print(f"\n🔔 Đúng {daily_time}! Bắt đầu kích hoạt gửi cảnh báo công việc...")
+                    try:
+                        notifier.scan_and_alert(dry_run=dry_run)
+                        last_triggered_date = cur_date
+                    except Exception as e:
+                        print(f"[Scanner] Lỗi quét vào lúc {daily_time}: {e}")
+            else:
+                # Interval mode
+                if stop_event.wait(timeout=interval_secs):
+                    break
+                try:
+                    notifier.scan_and_alert(dry_run=dry_run)
+                except Exception as e:
+                    print(f"[Scanner] Lỗi quét định kỳ: {e}")
 
     # Start periodic scanner thread
     scan_thread = threading.Thread(target=periodic_scanner, daemon=True)
