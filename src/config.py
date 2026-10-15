@@ -10,6 +10,16 @@ ENV_PATH = BASE_DIR / ".env"
 load_dotenv(dotenv_path=ENV_PATH)
 
 
+def _get_int(key: str, default: int) -> int:
+    val = os.getenv(key, "")
+    if not val or not val.strip():
+        return default
+    try:
+        return int(val.strip())
+    except ValueError:
+        return default
+
+
 class Config:
     # Trello credentials
     TRELLO_API_KEY = os.getenv("TRELLO_API_KEY", "").strip()
@@ -24,11 +34,11 @@ class Config:
     TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
 
     # Time thresholds & options
-    HOURS_BEFORE_DUE = int(os.getenv("HOURS_BEFORE_DUE", "24"))
+    HOURS_BEFORE_DUE = _get_int("HOURS_BEFORE_DUE", 24)
     INCLUDE_OVERDUE = os.getenv("INCLUDE_OVERDUE", "true").lower() in ("true", "1", "yes")
-    MAX_OVERDUE_HOURS = int(os.getenv("MAX_OVERDUE_HOURS", "72"))
-    REMIND_INTERVAL_HOURS = int(os.getenv("REMIND_INTERVAL_HOURS", "12"))
-    CHECK_INTERVAL_MINUTES = int(os.getenv("CHECK_INTERVAL_MINUTES", "30"))
+    MAX_OVERDUE_HOURS = _get_int("MAX_OVERDUE_HOURS", 0)
+    REMIND_INTERVAL_HOURS = _get_int("REMIND_INTERVAL_HOURS", 12)
+    CHECK_INTERVAL_MINUTES = _get_int("CHECK_INTERVAL_MINUTES", 30)
 
     # Timezone & output options
     TIMEZONE = os.getenv("TIMEZONE", "Asia/Ho_Chi_Minh").strip()
