@@ -32,7 +32,7 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           HOURS_BEFORE_DUE: 24
           INCLUDE_OVERDUE: true
-          MAX_OVERDUE_HOURS: 0
+          MAX_OVERDUE_HOURS: ${{ secrets.MAX_OVERDUE_HOURS || '0' }}
           TIMEZONE: Asia/Ho_Chi_Minh
           SEND_MODE: detailed
         run: |
