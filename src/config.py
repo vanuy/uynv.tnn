@@ -29,9 +29,13 @@ class Config:
     _board_ids_raw = os.getenv("TRELLO_BOARD_IDS", "").strip()
     TRELLO_BOARD_IDS = [b.strip() for b in _board_ids_raw.split(",") if b.strip()]
 
-    # Telegram credentials & admin whitelist
+    # Telegram credentials & chat routing
     TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
     TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+    # Group chat ID: for sending automated daily due & overdue task alerts
+    TELEGRAM_GROUP_CHAT_ID = os.getenv("TELEGRAM_GROUP_CHAT_ID", "").strip() or TELEGRAM_CHAT_ID
+    # Admin personal chat ID: for private command interaction with @nguyenvanuy
+    TELEGRAM_ADMIN_CHAT_ID = os.getenv("TELEGRAM_ADMIN_CHAT_ID", "851630770").strip()
     _admins_raw = os.getenv("ADMIN_USERNAMES", "nguyenvanuy").strip()
     ADMIN_USERNAMES = [u.strip().lstrip("@").lower() for u in _admins_raw.split(",") if u.strip()]
 

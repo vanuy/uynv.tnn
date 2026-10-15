@@ -25,6 +25,8 @@ class DummyConfig:
     TRELLO_BOARD_IDS = []
     TELEGRAM_BOT_TOKEN = "test_bot_token"
     TELEGRAM_CHAT_ID = "123456789"
+    TELEGRAM_GROUP_CHAT_ID = "-1004404557034"
+    TELEGRAM_ADMIN_CHAT_ID = "851630770"
     HOURS_BEFORE_DUE = 24
     INCLUDE_OVERDUE = True
     MAX_OVERDUE_HOURS = 72
@@ -123,8 +125,8 @@ class MockTelegramClient:
     def escape_html(self, text):
         return TelegramClient.escape_html(text)
 
-    def send_message(self, text, parse_mode="HTML"):
-        self.sent_messages.append({"text": text, "parse_mode": parse_mode})
+    def send_message(self, text, parse_mode="HTML", **kwargs):
+        self.sent_messages.append({"text": text, "parse_mode": parse_mode, "kwargs": kwargs})
         return {"success": True}
 
 

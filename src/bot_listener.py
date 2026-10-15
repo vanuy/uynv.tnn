@@ -137,14 +137,21 @@ class TelegramBotListener:
                     text = msg.get("text", "")
                     sender = msg.get("from", {})
                     sender_username = (sender.get("username") or "").strip().lower()
-                    sender_chat_id = str(msg.get("chat", {}).get("id", ""))
+                    chat = msg.get("chat", {})
+                    chat_type = chat.get("type", "private")  # "private", "group", "supergroup"
+                    sender_chat_id = str(chat.get("id", ""))
                     thread_id = msg.get("message_thread_id")
 
                     if text.startswith("/"):
-                        # Only allow authorized admin usernames
+                        # Only accept commands in private chat directly with the bot (keep group clean)
+                        if chat_type != "private":
+                            # Ignore commands typed in groups
+                            continue
+
+                        # Only allow authorized admin username (e.g. @nguyenvanuy)
                         if self.config.ADMIN_USERNAMES:
                             if sender_username not in self.config.ADMIN_USERNAMES:
-                                print(f"[Telegram Bot] Bỏ qua lệnh '{text}' từ @{sender_username} (không có trong danh sách cho phép).")
+                                print(f"[Telegram Bot] Bỏ qua lệnh '{text}' từ @{sender_username} (không có trong danh sách admin).")
                                 continue
 
                         self.handle_command(text, sender_chat_id, message_thread_id=thread_id)

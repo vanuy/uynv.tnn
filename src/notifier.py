@@ -144,12 +144,14 @@ class Notifier:
         cards_to_send = overdue_cards + due_soon_cards
         sent_count = 0
 
+        target_group_chat = getattr(self.config, "TELEGRAM_GROUP_CHAT_ID", None) or getattr(self.config, "TELEGRAM_CHAT_ID", None)
+
         if self.config.SEND_MODE in ("summary", "both"):
             summary_msg = self._build_summary_message(due_soon_cards, overdue_cards)
             if dry_run:
                 print("\n[DRY-RUN TỔNG HỢP]:\n" + summary_msg)
             else:
-                res = self.telegram.send_message(summary_msg)
+                res = self.telegram.send_message(summary_msg, chat_id=target_group_chat)
                 if res.get("success"):
                     sent_count += 1
                 else:
@@ -161,7 +163,7 @@ class Notifier:
                 if dry_run:
                     print(f"\n[DRY-RUN THẺ {card['name']}]:\n" + msg)
                 else:
-                    res = self.telegram.send_message(msg)
+                    res = self.telegram.send_message(msg, chat_id=target_group_chat)
                     if res.get("success"):
                         self.state_mgr.record_notification(card["id"], card["alert_type"], card["due"])
                         sent_count += 1
