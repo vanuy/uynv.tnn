@@ -1,0 +1,39 @@
+name: Trello Telegram Daily 4PM Alert
+
+on:
+  schedule:
+    # 09:00 UTC = 16:00 (4h chiều) Giờ Việt Nam (UTC+7)
+    - cron: '0 9 * * *'
+  workflow_dispatch: # Cho phép bấm nút chạy thủ công bất cứ lúc nào trên GitHub
+
+jobs:
+  trello-alert:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run daily alert
+        env:
+          TRELLO_API_KEY: ${{ secrets.TRELLO_API_KEY }}
+          TRELLO_TOKEN: ${{ secrets.TRELLO_TOKEN }}
+          TRELLO_BOARD_IDS: ${{ secrets.TRELLO_BOARD_IDS }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          HOURS_BEFORE_DUE: 24
+          INCLUDE_OVERDUE: true
+          MAX_OVERDUE_HOURS: 0
+          TIMEZONE: Asia/Ho_Chi_Minh
+          SEND_MODE: detailed
+        run: |
+          python main.py --once
