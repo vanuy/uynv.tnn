@@ -129,3 +129,22 @@ class TrelloClient:
             })
 
         return due_cards
+
+    def get_current_user(self) -> Dict[str, Any]:
+        """Get current user details."""
+        return self._request("GET", "/members/me", {"fields": "id,fullName,username"})
+
+    def add_member_to_card(self, card_id: str, member_id: str) -> bool:
+        """Add a member to a card."""
+        try:
+            self._request("POST", f"/cards/{card_id}/idMembers", {"value": member_id})
+            return True
+        except Exception as e:
+            if "member is already on the card" in str(e).lower():
+                return True
+            try:
+                self._request("PUT", f"/cards/{card_id}", {"idMembers": member_id})
+                return True
+            except Exception:
+                return False
+

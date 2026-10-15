@@ -52,6 +52,16 @@ def parse_args():
         help="Xuất danh sách link các task chưa gán người thực hiện, chưa có nhãn hoặc chưa có hạn",
     )
     parser.add_argument(
+        "--assign-chuagiao",
+        action="store_true",
+        help="Tự động gán tài khoản Uy Nguyễn vào tất cả các task chưa giao (/chuagiao)",
+    )
+    parser.add_argument(
+        "--assign-all",
+        action="store_true",
+        help="Tự động gán tài khoản Uy Nguyễn vào TẤT CẢ các task chưa có người thực hiện",
+    )
+    parser.add_argument(
         "--once",
         action="store_true",
         help="Chạy quét cảnh báo 1 lần duy nhất rồi thoát (phù hợp cho Task Scheduler)",
@@ -208,6 +218,36 @@ def handle_chuagiao(analytics: TrelloAnalytics, telegram: TelegramClient, dry_ru
             time.sleep(0.5)
 
 
+def handle_assign_tasks(trello: TrelloClient, telegram: TelegramClient, mode: str = "chuagiao", dry_run: bool = False):
+    from src.assigner import TaskAssigner
+    assigner = TaskAssigner(trello, Config.TRELLO_BOARD_IDS)
+    mode_text = "các task chưa giao (/chuagiao)" if mode == "chuagiao" else "TẤT CẢ các task chưa có người"
+    print("=" * 60)
+    print(f"👤 BẮT ĐẦU GÁN 'UY NGUYỄN' VÀO: {mode_text.upper()}")
+    print("=" * 60)
+    result = assigner.assign_cards(mode=mode, dry_run=dry_run)
+    print("\n" + "=" * 60)
+    print("📊 KẾT QUẢ GÁN THÀNH VIÊN:")
+    print(f"   • Tổng số thẻ thỏa điều kiện: {result['total']}")
+    print(f"   • Gán thành công: {result['success']}")
+    print(f"   • Thất bại: {result['failed']}")
+    print(f"   • Người được gán: {result['member_name']} (ID: {result['member_id']})")
+    print("=" * 60)
+
+    if not dry_run and result["total"] > 0:
+        target_chat = Config.TELEGRAM_ADMIN_CHAT_ID or Config.TELEGRAM_CHAT_ID
+        msg = (
+            f"✅ <b>HOÀN TẤT GÁN THÀNH VIÊN TỰ ĐỘNG</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━━\n"
+            f"• Người được gán: <b>{result['member_name']}</b>\n"
+            f"• Đã gán thành công: <b>{result['success']} / {result['total']} task</b>\n"
+            f"• Tiêu chí: {mode_text}\n"
+            f"━━━━━━━━━━━━━━━━━━━━━"
+        )
+        telegram.send_message(msg, chat_id=target_chat)
+
+
+
 def run_daemon_mode(notifier: Notifier, listener: TelegramBotListener, dry_run: bool = False):
     print("=" * 60)
     print("🚀 BẮT ĐẦU CHẠY THƯỜNG TRỰC (DAEMON + TELEGRAM LISTENER)")
@@ -276,7 +316,7 @@ def main():
     args = parse_args()
 
     # If no flags provided, default to --once
-    if not (args.test or args.list_boards or args.get_chat_id or args.phantich or args.chuagiao or args.daemon or args.once or args.dry_run):
+    if not (args.test or args.list_boards or args.get_chat_id or args.phantich or args.chuagiao or args.assign_chuagiao or args.assign_all or args.daemon or args.once or args.dry_run):
         args.once = True
 
     # Validate config
@@ -317,6 +357,14 @@ def main():
 
     if args.chuagiao:
         handle_chuagiao(analytics, telegram, dry_run=args.dry_run)
+        return
+
+    if args.assign_chuagiao:
+        handle_assign_tasks(trello, telegram, mode="chuagiao", dry_run=args.dry_run)
+        return
+
+    if args.assign_all:
+        handle_assign_tasks(trello, telegram, mode="all_unassigned", dry_run=args.dry_run)
         return
 
     if args.daemon:

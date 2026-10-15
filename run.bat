@@ -33,10 +33,11 @@ echo  4. Quét thử nghiệm không gửi tin (--dry-run)
 echo  5. Chạy thường trực kiểm tra định kỳ & lắng nghe lệnh Telegram (--daemon)
 echo  6. Xuất báo cáo phân tích khối lượng & xếp hạng thành viên (--phantich)
 echo  7. Xuất danh sách link các task chưa giao / chưa gán người (--chuagiao)
-echo  8. Cài đặt lại thư viện (pip install)
+echo  8. Gán tài khoản Uy Nguyễn vào các task chưa giao (--assign-chuagiao)
+echo  9. Cài đặt lại thư viện (pip install)
 echo  0. Thoát
 echo.
-set /p opt="Vui lòng chọn chức năng (0-8): "
+set /p opt="Vui lòng chọn chức năng (0-9): "
 
 if "%opt%"=="1" (
     .\venv\Scripts\python.exe main.py --test
@@ -74,6 +75,11 @@ if "%opt%"=="7" (
     goto menu
 )
 if "%opt%"=="8" (
+    .\venv\Scripts\python.exe main.py --assign-chuagiao
+    pause
+    goto menu
+)
+if "%opt%"=="9" (
     .\venv\Scripts\python.exe -m pip install -r requirements.txt
     pause
     goto menu
