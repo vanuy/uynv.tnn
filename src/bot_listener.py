@@ -27,44 +27,64 @@ class TelegramBotListener:
         self.last_update_id = 0
         self.is_running = False
 
-    def handle_command(self, text: str, chat_id: str):
+    def handle_command(self, text: str, chat_id: str, message_thread_id: Optional[int] = None):
         """Process incoming slash commands from Telegram chat."""
         cmd = text.strip().split()[0].lower()
         # Remove @botname suffix if present (e.g. /phantich@yteProgressbot)
         if "@" in cmd:
             cmd = cmd.split("@")[0]
 
-        print(f"[Telegram Bot] Nhận lệnh '{cmd}' từ Chat ID: {chat_id}")
+        print(f"[Telegram Bot] Nhận lệnh '{cmd}' từ Chat ID: {chat_id} (Thread: {message_thread_id})")
 
         if cmd in ("/phantich", "/baocao", "/report", "/analytics"):
             # 1. Send typing / wait message
-            wait_res = self.telegram.send_message(
+            self.telegram.send_message(
                 "⏳ <b>Đang thu thập và phân tích dữ liệu các bảng Trello...</b>\n"
-                "<i>Hệ thống đang tính toán khối lượng công việc và xếp hạng thành viên, vui lòng đợi trong giây lát!</i>"
+                "<i>Hệ thống đang tính toán khối lượng công việc và xếp hạng thành viên, vui lòng đợi trong giây lát!</i>",
+                chat_id=chat_id,
+                message_thread_id=message_thread_id,
             )
 
             try:
                 data = self.analytics.analyze()
                 messages = self.analytics.format_report_html(data)
                 for msg in messages:
-                    self.telegram.send_message(msg)
+                    self.telegram.send_message(
+                        msg,
+                        chat_id=chat_id,
+                        message_thread_id=message_thread_id,
+                    )
                     time.sleep(0.5)
             except Exception as e:
                 err_msg = f"❌ <b>Lỗi trong quá trình phân tích:</b> {e}"
                 print(f"[Analytics Error] {e}")
-                self.telegram.send_message(err_msg)
+                self.telegram.send_message(
+                    err_msg,
+                    chat_id=chat_id,
+                    message_thread_id=message_thread_id,
+                )
 
         elif cmd in ("/quet", "/scan", "/check"):
-            self.telegram.send_message("🔍 <b>Đang bắt đầu quét các task Trello sắp hết hạn và quá hạn...</b>")
+            self.telegram.send_message(
+                "🔍 <b>Đang bắt đầu quét các task Trello sắp hết hạn và quá hạn...</b>",
+                chat_id=chat_id,
+                message_thread_id=message_thread_id,
+            )
             try:
                 res = self.notifier.scan_and_alert()
                 if res["sent"] == 0:
                     self.telegram.send_message(
                         f"✅ <b>Quét hoàn tất:</b> Không có cảnh báo mới nào cần gửi!\n"
-                        f"(Có {res['due_soon']} thẻ sắp hạn, {res['overdue']} thẻ quá hạn - tất cả đã được thông báo trước đó)."
+                        f"(Có {res['due_soon']} thẻ sắp hạn, {res['overdue']} thẻ quá hạn - tất cả đã được thông báo trước đó).",
+                        chat_id=chat_id,
+                        message_thread_id=message_thread_id,
                     )
             except Exception as e:
-                self.telegram.send_message(f"❌ <b>Lỗi khi quét:</b> {e}")
+                self.telegram.send_message(
+                    f"❌ <b>Lỗi khi quét:</b> {e}",
+                    chat_id=chat_id,
+                    message_thread_id=message_thread_id,
+                )
 
         elif cmd in ("/start", "/help"):
             help_msg = (
@@ -75,7 +95,11 @@ class TelegramBotListener:
                 "ℹ️ <b>/help</b> - Hiển thị menu hướng dẫn này.\n\n"
                 "<i>Bot sẽ tự động chạy ngầm và gửi cảnh báo khi có thẻ sắp hết hạn theo chu kỳ cấu hình.</i>"
             )
-            self.telegram.send_message(help_msg)
+            self.telegram.send_message(
+                help_msg,
+                chat_id=chat_id,
+                message_thread_id=message_thread_id,
+            )
 
     def start_polling(self, stop_event: Optional[threading.Event] = None):
         """Start long-polling loop to listen for Telegram commands."""
@@ -112,9 +136,10 @@ class TelegramBotListener:
 
                     text = msg.get("text", "")
                     sender_chat_id = str(msg.get("chat", {}).get("id", ""))
+                    thread_id = msg.get("message_thread_id")
 
                     if text.startswith("/"):
-                        self.handle_command(text, sender_chat_id)
+                        self.handle_command(text, sender_chat_id, message_thread_id=thread_id)
 
             except requests.exceptions.Timeout:
                 # Normal long polling timeout, just loop

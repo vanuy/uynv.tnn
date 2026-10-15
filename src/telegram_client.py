@@ -58,15 +58,25 @@ class TelegramClient:
                 "error": str(e),
             }
 
-    def send_message(self, text: str, parse_mode: str = "HTML", disable_web_page_preview: bool = False) -> Dict[str, Any]:
+    def send_message(
+        self,
+        text: str,
+        parse_mode: str = "HTML",
+        disable_web_page_preview: bool = False,
+        chat_id: Optional[str] = None,
+        message_thread_id: Optional[int] = None,
+    ) -> Dict[str, Any]:
         """Send message via Telegram Bot API with retry for rate limits."""
         url = f"{self.base_url}/sendMessage"
+        target_chat = chat_id or self.chat_id
         payload = {
-            "chat_id": self.chat_id,
+            "chat_id": target_chat,
             "text": text,
             "parse_mode": parse_mode,
             "disable_web_page_preview": disable_web_page_preview,
         }
+        if message_thread_id:
+            payload["message_thread_id"] = message_thread_id
 
         max_retries = 3
         for attempt in range(max_retries):
