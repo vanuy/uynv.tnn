@@ -86,11 +86,36 @@ class TelegramBotListener:
                     message_thread_id=message_thread_id,
                 )
 
+        elif cmd in ("/chuagiao", "/unassigned", "/chuaphancong"):
+            self.telegram.send_message(
+                "⏳ <b>Đang quét các task chưa gán người thực hiện, chưa có nhãn hoặc chưa có hạn...</b>\n"
+                "<i>Hệ thống đang tổng hợp link các thẻ, vui lòng đợi trong giây lát!</i>",
+                chat_id=chat_id,
+                message_thread_id=message_thread_id,
+            )
+            try:
+                data = self.analytics.get_unassigned_tasks()
+                messages = self.analytics.format_unassigned_html(data)
+                for msg in messages:
+                    self.telegram.send_message(
+                        msg,
+                        chat_id=chat_id,
+                        message_thread_id=message_thread_id,
+                    )
+                    time.sleep(0.5)
+            except Exception as e:
+                self.telegram.send_message(
+                    f"❌ <b>Lỗi khi quét thẻ chưa giao:</b> {e}",
+                    chat_id=chat_id,
+                    message_thread_id=message_thread_id,
+                )
+
         elif cmd in ("/start", "/help"):
             help_msg = (
                 "👋 <b>Chào mừng bạn đến với Bot Quản Lý & Cảnh Báo Trello!</b>\n\n"
                 "📌 <b>Danh sách lệnh bạn có thể sử dụng:</b>\n\n"
                 "📊 <b>/phantich</b> - Xuất báo cáo công việc chi tiết: ai làm nhiều task nhất, tỉ lệ chưa xong/đã xong, và bảng xếp hạng thành viên.\n\n"
+                "📋 <b>/chuagiao</b> - Xuất danh sách link các task chưa có người thực hiện, chưa gán nhãn hoặc chưa có hạn.\n\n"
                 "⏰ <b>/quet</b> - Kích hoạt quét ngay các thẻ sắp hết hạn hoặc quá hạn trên Trello.\n\n"
                 "ℹ️ <b>/help</b> - Hiển thị menu hướng dẫn này.\n\n"
                 "<i>Bot sẽ tự động chạy ngầm và gửi cảnh báo khi có thẻ sắp hết hạn theo chu kỳ cấu hình.</i>"

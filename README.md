@@ -11,12 +11,19 @@ Hệ thống tự động quét các thẻ (card) trên Trello có hạn chót (
   - Tỉ lệ số task chưa hoàn thành trên tổng số task được giao (ví dụ: `69 / 149 (46.3%)`).
   - Đếm số lượng task quá hạn của từng thành viên.
   - Tự động xếp hạng (🥇, 🥈, 🥉) và đánh giá danh hiệu (Xuất sắc, Tốt, Quá tải, Cần hỗ trợ).
+  - *Chỉ gửi về chat riêng của Admin (`@nguyenvanuy`).*
+- 📌 **Lệnh liệt kê task chưa giao (`/chuagiao`):**
+  - Tự động lọc các thẻ chưa gán người phụ trách, chưa có nhãn (label) và chưa có deadline.
+  - Trả về danh sách link trực tiếp kèm format `[chưa có người thực hiện ....]`.
+  - Phân nhóm rõ ràng theo từng Bảng Trello.
+  - *Chỉ gửi về chat riêng của Admin (`@nguyenvanuy`).*
 - 🤖 **Tương tác trực tiếp trên Telegram:**
-  - Nhắn tin `/phantich` vào bot bất kỳ lúc nào để nhận báo cáo phân tích mới nhất.
-  - Nhắn tin `/quet` để bot quét ngay lập tức.
-  - Nhắn tin `/help` để xem danh sách lệnh.
+  - Nhắn tin `/phantich` hoặc `/chuagiao` vào chat riêng với bot để nhận báo cáo.
+  - Chỉ duy nhất Admin `@nguyenvanuy` mới có quyền thực thi lệnh bot.
+  - Nhóm chung không bị ảnh hưởng hay spam lệnh.
 - ⏰ **Cảnh báo trước khi hết hạn:** Tự động phát hiện các task sắp đến hạn theo ngưỡng thời gian cấu hình (mặc định 24 giờ).
-- 🚨 **Cảnh báo task quá hạn:** Nhắc nhở các việc đã trễ hạn để kịp thời xử lý.
+- 🚨 **Cảnh báo task quá hạn:** Nhắc nhở các việc đã trễ hạn để kịp thời xử lý (gửi vào nhóm chung).
+- ☁️ **Deploy Cloud 24/7 với GitHub Actions:** Tự động gửi cảnh báo hàng ngày vào lúc 16:00 chiều mà không cần bật máy tính.
 - 🛡️ **Cơ chế chống spam thông minh (Deduplication):**
   - Không gửi tin nhắn lặp lại liên tục cho cùng một thẻ trong mỗi chu kỳ quét.
   - Tự động nhắc lại sau một khoảng thời gian quy định (ví dụ: mỗi 12 giờ) nếu task vẫn chưa hoàn thành.
@@ -26,11 +33,6 @@ Hệ thống tự động quét các thẻ (card) trên Trello có hạn chót (
   - Bảng (Board) và Danh sách (List) tương ứng (VD: To Do, Doing, Review).
   - Người phụ trách (Assignees) & Nhãn công việc (Labels).
   - Thời gian còn lại hoặc thời gian đã trễ hạn tính theo múi giờ Việt Nam.
-- ⚙️ **Linh hoạt & Đa chế độ chạy:**
-  - Chạy quét 1 lần (`--once`) phù hợp gắn vào Windows Task Scheduler hoặc Cron Job.
-  - Chạy nền thường trực (`--daemon`) tự động lặp lại theo chu kỳ phút.
-  - Hỗ trợ kiểm tra kết nối (`--test`), quét giả lập không gửi tin (`--dry-run`), xem ID bảng (`--list-boards`).
-  - Menu khởi chạy nhanh trên Windows (`run.bat`).
 
 ---
 
@@ -38,6 +40,10 @@ Hệ thống tự động quét các thẻ (card) trên Trello có hạn chót (
 
 ```
 NhachanTrello/
+├── .github/workflows/
+│   ├── daily_alert.yml     # GitHub Actions: Tự động gửi cảnh báo 16:00 VN hàng ngày
+│   ├── phantich.yml        # GitHub Actions: Kích hoạt xuất báo cáo phân tích
+│   └── chuagiao.yml        # GitHub Actions: Kích hoạt xuất danh sách task chưa giao
 ├── .env.example            # File mẫu cấu hình biến môi trường
 ├── .gitignore              # Bỏ qua file nhạy cảm và cache
 ├── requirements.txt        # Danh sách thư viện Python
@@ -49,7 +55,9 @@ NhachanTrello/
 │   ├── trello_client.py    # Giao tiếp với Trello REST API
 │   ├── telegram_client.py  # Giao tiếp với Telegram Bot API
 │   ├── state_manager.py    # Quản lý trạng thái đã cảnh báo (chống spam)
-│   └── notifier.py         # Bộ máy quét thẻ và xử lý cảnh báo
+│   ├── notifier.py         # Bộ máy quét thẻ và xử lý cảnh báo quá hạn
+│   ├── analytics.py        # Phân tích KPI thành viên & quét task chưa giao
+│   └── bot_listener.py     # Lắng nghe & phản hồi lệnh Telegram từ Admin
 └── tests/
     └── test_all.py         # Kiểm thử tự động (Unit & End-to-end tests)
 ```
@@ -123,8 +131,10 @@ Bạn chỉ cần nhấp đúp chuột vào file **`run.bat`** (hoặc chạy tr
  2. Xem danh sách các bảng Trello để lấy ID (--list-boards)
  3. Quét và gửi cảnh báo 1 lần (--once)
  4. Quét thử nghiệm không gửi tin (--dry-run)
- 5. Chạy thường trực kiểm tra định kỳ (--daemon)
- 6. Cài đặt lại thư viện (pip install)
+ 5. Chạy thường trực kiểm tra định kỳ & lắng nghe lệnh Telegram (--daemon)
+ 6. Xuất báo cáo phân tích khối lượng & xếp hạng thành viên (--phantich)
+ 7. Xuất danh sách link các task chưa giao / chưa gán người (--chuagiao)
+ 8. Cài đặt lại thư viện (pip install)
  0. Thoát
 ```
 
@@ -134,31 +144,53 @@ Bạn chỉ cần nhấp đúp chuột vào file **`run.bat`** (hoặc chạy tr
 ```powershell
 .\venv\Scripts\python.exe main.py --test
 ```
-*Lệnh này sẽ kiểm tra tài khoản Trello và gửi một tin nhắn test đến Telegram của bạn để xác nhận mọi thứ hoạt động.*
 
 #### 2. Xem danh sách Bảng & Lấy Board ID:
 ```powershell
 .\venv\Scripts\python.exe main.py --list-boards
 ```
 
-#### 3. Chạy thử nghiệm giả lập (Dry Run):
+#### 3. Báo cáo phân tích khối lượng & xếp hạng thành viên:
 ```powershell
-.\venv\Scripts\python.exe main.py --dry-run
+.\venv\Scripts\python.exe main.py --phantich
 ```
-*Quét và in toàn bộ thông báo ra màn hình console, không gửi tới Telegram và không lưu trạng thái.*
+*Gửi trực tiếp bảng phân tích, xếp hạng 🥇, 🥈, 🥉 và task quá hạn vào Telegram cá nhân của Admin.*
 
-#### 4. Quét và gửi cảnh báo 1 lần:
+#### 4. Danh sách task chưa gán người phụ trách:
+```powershell
+.\venv\Scripts\python.exe main.py --chuagiao
+```
+*Gửi danh sách thẻ chưa giao (không người, không label, không deadline) kèm link dạng `[chưa có người thực hiện ....]` về Telegram Admin.*
+
+#### 5. Quét và gửi cảnh báo 1 lần vào nhóm chung:
 ```powershell
 .\venv\Scripts\python.exe main.py --once
 ```
 
-#### 5. Chạy thường trực định kỳ (Daemon mode):
+#### 6. Chạy thường trực định kỳ & Lắng nghe lệnh Telegram:
 ```powershell
 .\venv\Scripts\python.exe main.py --daemon
 ```
-*Chương trình sẽ chạy liên tục, tự động quét sau mỗi `CHECK_INTERVAL_MINUTES` phút (mặc định 30 phút).*
 
 ---
+
+## ☁️ Triển Khai Chạy Hoàn Toàn Trên GitHub Actions (Không Cần Bật Máy Tính)
+
+Dự án đã được tích hợp sẵn 3 Workflows trên GitHub Actions:
+1. **Daily Trello Due Alert (`daily_alert.yml`):** Tự động kích hoạt hàng ngày vào lúc **16:00 (giờ Việt Nam)** để quét và gửi cảnh báo vào nhóm chung.
+2. **Trello Workload Analytics (`phantich.yml`):** Kích hoạt thủ công khi cần gửi báo cáo phân tích về chat riêng của Admin.
+3. **Trello Unassigned Tasks Report (`chuagiao.yml`):** Kích hoạt thủ công khi cần gửi danh sách task chưa giao về chat riêng của Admin.
+
+### Cấu hình Secrets trên GitHub:
+Vào GitHub Repository -> **Settings** -> **Secrets and variables** -> **Actions** -> Chọn **New repository secret**:
+- `TRELLO_API_KEY`: Key Trello của bạn
+- `TRELLO_TOKEN`: Token Trello của bạn
+- `TELEGRAM_BOT_TOKEN`: Token của Telegram Bot
+- `TELEGRAM_GROUP_CHAT_ID`: Chat ID nhóm chung nhận cảnh báo quá hạn (VD: `-1004404557034`)
+- `TELEGRAM_ADMIN_CHAT_ID`: Chat ID riêng của Admin nhận phân tích (VD: `851630770`)
+- `ADMIN_USERNAMES`: `nguyenvanuy`
+- `HOURS_BEFORE_DUE`: `24`
+- `MAX_OVERDUE_HOURS`: `0`
 
 ## ⏰ Hướng Dẫn Cài Đặt Chạy Tự Động Định Kỳ Trên Windows (Windows Task Scheduler)
 

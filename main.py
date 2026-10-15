@@ -47,6 +47,11 @@ def parse_args():
         help="Phân tích khối lượng công việc, tỉ lệ hoàn thành và xếp hạng thành viên",
     )
     parser.add_argument(
+        "--chuagiao",
+        action="store_true",
+        help="Xuất danh sách link các task chưa gán người thực hiện, chưa có nhãn hoặc chưa có hạn",
+    )
+    parser.add_argument(
         "--once",
         action="store_true",
         help="Chạy quét cảnh báo 1 lần duy nhất rồi thoát (phù hợp cho Task Scheduler)",
@@ -181,6 +186,28 @@ def handle_phantich(analytics: TrelloAnalytics, telegram: TelegramClient, dry_ru
                 print(f"❌ Lỗi khi gửi báo cáo: {res.get('error')}")
 
 
+def handle_chuagiao(analytics: TrelloAnalytics, telegram: TelegramClient, dry_run: bool = False):
+    print("=" * 60)
+    print("📋 BẮT ĐẦU QUÉT CÁC TASK CHƯA GIAO & THIẾU THÔNG TIN")
+    print("=" * 60)
+    data = analytics.get_unassigned_tasks()
+    messages = analytics.format_unassigned_html(data)
+
+    target_chat = Config.TELEGRAM_ADMIN_CHAT_ID or Config.TELEGRAM_CHAT_ID
+    print(f"Gửi danh sách thẻ chưa giao tới Chat riêng Admin (ID: {target_chat})...")
+
+    for msg in messages:
+        if dry_run:
+            print("\n" + msg)
+        else:
+            res = telegram.send_message(msg, chat_id=target_chat)
+            if res.get("success"):
+                print("✅ Đã gửi danh sách thẻ chưa giao thành công tới Admin!")
+            else:
+                print(f"❌ Lỗi khi gửi danh sách: {res.get('error')}")
+            time.sleep(0.5)
+
+
 def run_daemon_mode(notifier: Notifier, listener: TelegramBotListener, dry_run: bool = False):
     print("=" * 60)
     print("🚀 BẮT ĐẦU CHẠY THƯỜNG TRỰC (DAEMON + TELEGRAM LISTENER)")
@@ -249,7 +276,7 @@ def main():
     args = parse_args()
 
     # If no flags provided, default to --once
-    if not (args.test or args.list_boards or args.get_chat_id or args.phantich or args.daemon or args.once or args.dry_run):
+    if not (args.test or args.list_boards or args.get_chat_id or args.phantich or args.chuagiao or args.daemon or args.once or args.dry_run):
         args.once = True
 
     # Validate config
@@ -286,6 +313,10 @@ def main():
 
     if args.phantich:
         handle_phantich(analytics, telegram, dry_run=args.dry_run)
+        return
+
+    if args.chuagiao:
+        handle_chuagiao(analytics, telegram, dry_run=args.dry_run)
         return
 
     if args.daemon:

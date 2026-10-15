@@ -295,3 +295,164 @@ class TrelloAnalytics:
             chunks.append("\n".join(current_chunk))
 
         return chunks
+
+    def get_unassigned_tasks(self, target_board_ids: List[str] = None) -> Dict[str, Any]:
+        """
+        Scan all open cards across boards that are unassigned, have no label, or have no due date.
+        """
+        if not target_board_ids:
+            target_board_ids = self.config.TRELLO_BOARD_IDS
+        if not target_board_ids:
+            boards = self.trello.get_my_boards()
+            target_board_ids = [b["id"] for b in boards]
+
+        unassigned_cards = []
+        total_open_cards = 0
+        count_no_member = 0
+        count_no_label = 0
+        count_no_due = 0
+        count_all_three = 0
+
+        for board_id in target_board_ids:
+            try:
+                board_info = self.trello._request("GET", f"/boards/{board_id}", {"fields": "id,name,url"})
+                board_name = board_info.get("name", "Bảng Trello")
+                lists_map = self.trello.get_board_lists(board_id)
+
+                cards_data = self.trello._request(
+                    "GET",
+                    f"/boards/{board_id}/cards",
+                    {
+                        "filter": "open",
+                        "fields": "id,name,due,dueComplete,url,idList,idMembers,labels,closed",
+                    },
+                )
+            except Exception as e:
+                print(f"[Analytics] Lỗi tải dữ liệu bảng {board_id}: {e}")
+                continue
+
+            for card in cards_data:
+                if card.get("closed"):
+                    continue
+
+                list_name = lists_map.get(card.get("idList", ""), "Mặc định")
+                # Skip completed cards
+                if bool(card.get("dueComplete")) or self.is_list_completed(list_name):
+                    continue
+
+                total_open_cards += 1
+                has_member = bool(card.get("idMembers"))
+                has_label = bool(card.get("labels"))
+                has_due = bool(card.get("due"))
+
+                if not has_member:
+                    count_no_member += 1
+                if not has_label:
+                    count_no_label += 1
+                if not has_due:
+                    count_no_due += 1
+                if not has_member and not has_label and not has_due:
+                    count_all_three += 1
+
+                # If card lacks member (unassigned), or lacks all three
+                if not has_member:
+                    missing_parts = ["[Chưa có người thực hiện]"]
+                    if not has_label:
+                        missing_parts.append("[Chưa gán nhãn]")
+                    if not has_due:
+                        missing_parts.append("[Chưa có hạn]")
+
+                    unassigned_cards.append({
+                        "id": card["id"],
+                        "name": card["name"],
+                        "url": card["url"],
+                        "board_name": board_name,
+                        "list_name": list_name,
+                        "no_member": not has_member,
+                        "no_label": not has_label,
+                        "no_due": not has_due,
+                        "is_all_three": (not has_member and not has_label and not has_due),
+                        "missing_desc": " | ".join(missing_parts),
+                    })
+
+        return {
+            "time_str": datetime.now(self.tz).strftime("%H:%M ngày %d/%m/%Y"),
+            "total_open": total_open_cards,
+            "count_no_member": count_no_member,
+            "count_no_label": count_no_label,
+            "count_no_due": count_no_due,
+            "count_all_three": count_all_three,
+            "cards": unassigned_cards,
+        }
+
+    def format_unassigned_html(self, data: Dict[str, Any]) -> List[str]:
+        """
+        Format unassigned tasks into clean, clickable HTML messages for Telegram.
+        """
+        escape = html.escape
+        time_str = data["time_str"]
+        count_no_member = data["count_no_member"]
+        count_all_three = data["count_all_three"]
+        cards = data["cards"]
+
+        lines = []
+        lines.append("📋 <b>DANH SÁCH CÁC TASK CHƯA GIAO (CHƯA CÓ NGƯỜI THỰC HIỆN)</b>")
+        lines.append(f"⏱ <i>Cập nhật lúc: {time_str} (Giờ VN)</i>")
+        lines.append("━━━━━━━━━━━━━━━━━━━━━")
+        lines.append("")
+        lines.append("📊 <b>TỔNG QUAN:</b>")
+        lines.append(f"• Thẻ chưa có người thực hiện: <b>{count_no_member} thẻ</b> 👤")
+        lines.append(f"• Thẻ thiếu cả 3 mục (Chưa người + Chưa nhãn + Chưa hạn): <b>{count_all_three} thẻ</b> ⚠️")
+        lines.append("")
+        lines.append("━━━━━━━━━━━━━━━━━━━━━")
+        lines.append("🔗 <b>DANH SÁCH CHI TIẾT CÁC THẺ CẦN PHÂN CÔNG:</b>")
+        lines.append("<i>(Bấm vào link [chưa có người thực hiện...] để mở thẻ trên Trello)</i>")
+        lines.append("")
+
+        if not cards:
+            lines.append("🎉 <b>Tuyệt vời!</b> Tất cả các thẻ công việc đều đã được phân công đầy đủ.")
+        else:
+            # Group cards by board
+            boards_dict: Dict[str, List[Dict[str, Any]]] = {}
+            for c in cards:
+                bname = c["board_name"]
+                if bname not in boards_dict:
+                    boards_dict[bname] = []
+                boards_dict[bname].append(c)
+
+            card_counter = 1
+            for bname, bcards in boards_dict.items():
+                lines.append(f"📋 <b>Bảng: {escape(bname)}</b> ({len(bcards)} thẻ):")
+                for c in bcards:
+                    name_escaped = escape(c["name"])
+                    url = c["url"]
+                    list_name = escape(c["list_name"])
+                    
+                    # Highlight cards with all three missing
+                    tag = "⚠️" if c["is_all_three"] else "📌"
+                    
+                    lines.append(
+                        f"{tag} {card_counter}. <a href=\"{url}\">[chưa có người thực hiện] <b>{name_escaped}</b></a>\n"
+                        f"   📂 <i>Cột: {list_name}</i> | <i>{escape(c['missing_desc'])}</i>"
+                    )
+                    card_counter += 1
+                lines.append("")
+
+        lines.append("<i>💡 Hãy bấm vào từng thẻ để gán người phụ trách, nhãn và ngày hạn chót nhé!</i>")
+
+        # Split into chunks of <= 3900 chars
+        chunks = []
+        current_chunk = []
+        current_len = 0
+        for line in lines:
+            if current_len + len(line) + 1 > 3800:
+                chunks.append("\n".join(current_chunk))
+                current_chunk = [line]
+                current_len = len(line) + 1
+            else:
+                current_chunk.append(line)
+                current_len += len(line) + 1
+        if current_chunk:
+            chunks.append("\n".join(current_chunk))
+
+        return chunks
