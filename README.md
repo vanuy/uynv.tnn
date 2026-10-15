@@ -134,7 +134,8 @@ Bạn chỉ cần nhấp đúp chuột vào file **`run.bat`** (hoặc chạy tr
  5. Chạy thường trực kiểm tra định kỳ & lắng nghe lệnh Telegram (--daemon)
  6. Xuất báo cáo phân tích khối lượng & xếp hạng thành viên (--phantich)
  7. Xuất danh sách link các task chưa giao / chưa gán người (--chuagiao)
- 8. Cài đặt lại thư viện (pip install)
+ 8. Gán tài khoản Uy Nguyễn vào các task chưa giao (--assign-chuagiao)
+ 9. Cài đặt lại thư viện (pip install)
  0. Thoát
 ```
 
@@ -162,12 +163,18 @@ Bạn chỉ cần nhấp đúp chuột vào file **`run.bat`** (hoặc chạy tr
 ```
 *Gửi danh sách thẻ chưa giao (không người, không label, không deadline) kèm link dạng `[chưa có người thực hiện ....]` về Telegram Admin.*
 
-#### 5. Quét và gửi cảnh báo 1 lần vào nhóm chung:
+#### 5. Gán tài khoản Uy Nguyễn vào các task chưa giao:
+```powershell
+.\venv\Scripts\python.exe main.py --assign-chuagiao
+```
+*Tự động gán Uy Nguyễn vào các task chưa có người + chưa có nhãn + chưa có hạn.*
+
+#### 6. Quét và gửi cảnh báo 1 lần vào nhóm chung:
 ```powershell
 .\venv\Scripts\python.exe main.py --once
 ```
 
-#### 6. Chạy thường trực định kỳ & Lắng nghe lệnh Telegram:
+#### 7. Chạy thường trực định kỳ & Lắng nghe lệnh Telegram:
 ```powershell
 .\venv\Scripts\python.exe main.py --daemon
 ```
@@ -176,10 +183,11 @@ Bạn chỉ cần nhấp đúp chuột vào file **`run.bat`** (hoặc chạy tr
 
 ## ☁️ Triển Khai Chạy Hoàn Toàn Trên GitHub Actions (Không Cần Bật Máy Tính)
 
-Dự án đã được tích hợp sẵn 3 Workflows trên GitHub Actions:
+Dự án đã được tích hợp sẵn 4 Workflows trên GitHub Actions:
 1. **Daily Trello Due Alert (`daily_alert.yml`):** Tự động kích hoạt hàng ngày vào lúc **16:00 (giờ Việt Nam)** để quét và gửi cảnh báo vào nhóm chung.
 2. **Trello Workload Analytics (`phantich.yml`):** Kích hoạt thủ công khi cần gửi báo cáo phân tích về chat riêng của Admin.
 3. **Trello Unassigned Tasks Report (`chuagiao.yml`):** Kích hoạt thủ công khi cần gửi danh sách task chưa giao về chat riêng của Admin.
+4. **Trello Assign Uy Nguyễn (`assign_chuagiao.yml`):** Kích hoạt thủ công khi cần tự động gán Uy Nguyễn vào các task chưa giao.
 
 ### Cấu hình Secrets trên GitHub:
 Vào GitHub Repository -> **Settings** -> **Secrets and variables** -> **Actions** -> Chọn **New repository secret**:
