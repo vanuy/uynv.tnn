@@ -37,6 +37,11 @@ def parse_args():
         help="Hiển thị danh sách tất cả các bảng Trello để lấy ID cấu hình",
     )
     parser.add_argument(
+        "--get-chat-id",
+        action="store_true",
+        help="Xem danh sách Chat ID của các nhóm hoặc người dùng gần đây nhắn cho Bot",
+    )
+    parser.add_argument(
         "--phantich",
         action="store_true",
         help="Phân tích khối lượng công việc, tỉ lệ hoàn thành và xếp hạng thành viên",
@@ -107,6 +112,50 @@ def handle_list_boards(trello: TrelloClient):
         print("        Nếu muốn theo dõi TẤT CẢ các bảng, chỉ cần để trống TRELLO_BOARD_IDS.")
     except Exception as e:
         print(f"❌ Lỗi khi lấy danh sách bảng: {e}")
+    print("=" * 60)
+
+
+def handle_get_chat_id(telegram: TelegramClient):
+    print("=" * 60)
+    print("📱 DANH SÁCH CHAT ID (NHÓM HOẶC CÁ NHÂN)")
+    print("=" * 60)
+    try:
+        url = f"{telegram.base_url}/getUpdates"
+        import requests
+        resp = requests.get(url, timeout=10)
+        data = resp.json()
+        if not data.get("ok"):
+            print(f"❌ Lỗi từ Telegram API: {data.get('description')}")
+            return
+
+        updates = data.get("result", [])
+        if not updates:
+            print("Chưa có tin nhắn nào gửi tới Bot.")
+            print("👉 Hướng dẫn: Thêm bot @yteProgressbot vào Nhóm của bạn và gửi 1 tin nhắn (VD: 'hello'), sau đó chạy lại lệnh này.")
+            return
+
+        seen = {}
+        for u in updates:
+            msg = u.get("message") or u.get("my_chat_member", {}).get("chat")
+            if isinstance(msg, dict):
+                chat = msg.get("chat") if "chat" in msg else msg
+                cid = chat.get("id")
+                ctype = chat.get("type", "unknown")
+                title = chat.get("title") or chat.get("first_name") or "Không tên"
+                if cid:
+                    seen[cid] = (ctype, title)
+
+        print(f"Tìm thấy {len(seen)} cuộc trò chuyện:\n")
+        print(f"{'LOẠI':<12} | {'TÊN NHÓM / NGƯỜI DÙNG':<30} | {'CHAT ID'}")
+        print("-" * 70)
+        for cid, (ctype, title) in seen.items():
+            print(f"{ctype:<12} | {title[:28]:<30} | {cid}")
+
+        print("-" * 70)
+        print("💡 Lưu ý: Đối với Nhóm (Group), CHAT ID luôn là số âm (bắt đầu bằng -100...)")
+        print("   Sao chép CHAT ID của nhóm dán vào TELEGRAM_CHAT_ID trong .env hoặc GitHub Secrets.")
+    except Exception as e:
+        print(f"❌ Lỗi: {e}")
     print("=" * 60)
 
 
@@ -196,12 +245,15 @@ def main():
     args = parse_args()
 
     # If no flags provided, default to --once
-    if not (args.test or args.list_boards or args.phantich or args.daemon or args.once or args.dry_run):
+    if not (args.test or args.list_boards or args.get_chat_id or args.phantich or args.daemon or args.once or args.dry_run):
         args.once = True
 
     # Validate config
     try:
-        if args.list_boards or args.dry_run:
+        if args.get_chat_id:
+            if not Config.TELEGRAM_BOT_TOKEN:
+                raise ValueError("Vui lòng cấu hình TELEGRAM_BOT_TOKEN trong .env trước.")
+        elif args.list_boards or args.dry_run:
             Config.validate(check_trello=True, check_telegram=False)
         else:
             Config.validate(check_trello=True, check_telegram=True)
@@ -215,6 +267,10 @@ def main():
     notifier = Notifier(Config, trello, telegram, state_mgr)
     analytics = TrelloAnalytics(Config, trello, telegram)
     listener = TelegramBotListener(Config, trello, telegram, notifier, analytics)
+
+    if args.get_chat_id:
+        handle_get_chat_id(telegram)
+        return
 
     if args.test:
         handle_test(trello, telegram)
