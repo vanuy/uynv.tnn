@@ -26,7 +26,8 @@ jobs:
           TRELLO_TOKEN: ${{ secrets.TRELLO_TOKEN }}
           TRELLO_BOARD_IDS: ${{ secrets.TRELLO_BOARD_IDS }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_ADMIN_CHAT_ID || secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_ADMIN_CHAT_ID: ${{ secrets.TELEGRAM_ADMIN_CHAT_ID || '851630770' }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_ADMIN_CHAT_ID || '851630770' }}
           TIMEZONE: Asia/Ho_Chi_Minh
         run: |
           python main.py --phantich

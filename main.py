@@ -166,13 +166,17 @@ def handle_phantich(analytics: TrelloAnalytics, telegram: TelegramClient, dry_ru
     data = analytics.analyze()
     messages = analytics.format_report_html(data)
 
+    # Strictly send to admin private chat (not to common group)
+    target_chat = Config.TELEGRAM_ADMIN_CHAT_ID or Config.TELEGRAM_CHAT_ID
+    print(f"Gửi báo cáo phân tích tới Chat riêng Admin (ID: {target_chat})...")
+
     for msg in messages:
         if dry_run:
             print("\n" + msg)
         else:
-            res = telegram.send_message(msg)
+            res = telegram.send_message(msg, chat_id=target_chat)
             if res.get("success"):
-                print("✅ Đã gửi báo cáo phân tích thành công tới Telegram!")
+                print("✅ Đã gửi báo cáo phân tích thành công tới Admin!")
             else:
                 print(f"❌ Lỗi khi gửi báo cáo: {res.get('error')}")
 
