@@ -1,0 +1,32 @@
+name: Trello Phân Tích & Xếp Hạng Thành Viên
+
+on:
+  workflow_dispatch: # Bấm nút chạy thủ công bất cứ lúc nào trên GitHub
+
+jobs:
+  trello-analytics:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Trello Analytics
+        env:
+          TRELLO_API_KEY: ${{ secrets.TRELLO_API_KEY }}
+          TRELLO_TOKEN: ${{ secrets.TRELLO_TOKEN }}
+          TRELLO_BOARD_IDS: ${{ secrets.TRELLO_BOARD_IDS }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TIMEZONE: Asia/Ho_Chi_Minh
+        run: |
+          python main.py --phantich
